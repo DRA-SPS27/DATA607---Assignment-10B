@@ -1,0 +1,32 @@
+---
+title: "Assignment 10B"
+author: "Kiera Griffiths, Desiree Thomas, Denise Atherley" 
+format: html
+editor: visual
+---
+
+### Approach
+
+```{r}
+
+library(jsonlite)
+library(tidyverse)
+
+# Retrieve live JSON data
+raw_nobel <- fromJSON("https://api.nobelprize.org/2.1/laureates")
+
+# Flatten the list into a tidy data frame
+laureates <- as_tibble(raw_nobel$laureates)
+```
+
+Our team will complete Assignment 10B by using RStudio and the jsonlite package to pull live data from the Nobel Prize API. We plan to use tidyverse tools to turn the complex nested JSON files into clean, flattened data frames. Our analysis will include four data-driven questions (see below) focused on geographic and identity trends, including a specific look at international migration by comparing where winners were born versus where their affiliated organizations were located.
+
+**Descriptive statistics:** *Question 1 (Simple Count)*: What is the distribution of Nobel Prizes by gender?
+
+**Data transformation/sorting:** *Question 2 (Filtering)*: Which 5 cities are the most common birthplaces for Nobel laureates?
+
+**Logical filtering:** *Question 3 (Filtering)*: How many Nobel laureates were born after the year 1950?
+
+**Complex: Question 4** *(Comparing Fields)*: How many Nobel laureates were born in a different country than where their winning organization was located?
+
+A data challenge we can anticipate is around any missing data and ensuring that we solve for that as we tackle answering the questions we identified.
