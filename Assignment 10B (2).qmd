@@ -31,6 +31,7 @@ Our team will complete Assignment 10B by using RStudio and the jsonlite package 
 A data challenge we can anticipate is around any missing data and ensuring that we solve for that as we tackle answering the questions we identified.
 
 ### Transform JSON into a Tidy Tibble
+
 ```{r}
 
 # We manually extracted nested fields to ensure stability and avoid naming errors.By manually mapping these fields, we avoid the naming conflicts and data loss that occur during automatic flattening. This also allows us to safely handle the 'NA' values found in organizational records and missing historical entries.
@@ -45,14 +46,39 @@ laureates <- tibble(
 ```
 
 ### Question 1: What is the distribution of Nobel Prizes by gender?
+
 ```{r}
 
 laureates %>%
   count(gender)
 ```
-We found that the dataset shows 90 of the 98 laureates with genders listed are male. We think this outcome is a direct reflection of the era from which this data is drawn. Since the API returns records starting from 1901, we are observing a time when institutional access for women in higher education and labs was severely restricted due to gender-based discrimination. 
+
+### Gender Visualization
+
+```{r}
+# 2. Gender Plot (Q1)
+laureates %>%
+  count(gender) %>%
+  ggplot(aes(x = gender, y = n, fill = gender)) +
+  geom_col() +
+  geom_text(aes(label = n), vjust = -0.5, fontface = "bold", size = 3) +
+ scale_fill_manual(values = c("male" = "#4a148c", 
+                               "female" = "#7b1fa2", 
+                               "org" = "#ce93d8")) +
+  labs(
+    title = "Question 1: Distribution of Nobel Prizes by Gender",
+    x = "Gender",
+    y = "Number of Laureates"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  expand_limits(y = max(laureates$n) * 1.1)
+```
+
+We found that the dataset shows 90 of the 98 laureates with genders listed are male. We think this outcome is a direct reflection of the era from which this data is drawn. Since the API returns records starting from 1901, we are observing a time when institutional access for women in higher education and labs was severely restricted due to gender-based discrimination.
 
 ### Question 2: Which 5 cities are the most common birthplaces for Nobel laureates?
+
 ```{r}
 
 top_cities <- laureates %>%
@@ -62,18 +88,22 @@ top_cities <- laureates %>%
 
 top_cities
 ```
+
 We think birthplaces clustering around major global hubs like New York, Paris, and London could be an indication that these cities acted as centers of innovation in the early 1900s and continue to be in current times. This suggests being born near a concentrated source of resources, mentorship, and funding likely increased the probability of achieving Nobel-level success.
 
 ### Question 3: How many Nobel laureates were born after the year 1950?
+
 ```{r}
 
 laureates %>%
   filter(birth_date >= "1950-01-01") %>%
   nrow()
 ```
+
 Only 13 individuals in this sample of 100 were born after 1950. We think this proves that the database's internal ID system is not a true timeline and some "modern" laureates are scattered within the sample of the first 100 IDs pulled. See visualization below for more distribution across birth periods.
 
 ### Birth Period Visualization
+
 ```{r}
 
 # Group data into 25-year quarter centuries
@@ -104,9 +134,10 @@ ggplot(quarter_century_data, aes(x = period, y = n)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-As seen in the visualization, the vast majority of our 100 ID sample was born between 1900 and 1950. We think the thirteen people we see in the 1950-1999 portion of the plot represents the most contemporary edge of this specific data slice. 
+As seen in the visualization, the vast majority of our 100 ID sample was born between 1900 and 1950. We think the thirteen people we see in the 1950-1999 portion of the plot represents the most contemporary edge of this specific data slice.
 
 ### Question 4: How many Nobel laureates were born in a different country than where their winning organization was located?
+
 ```{r}
 
 #Extracting affiliation country from the list
@@ -130,7 +161,8 @@ migrated_count
 
 We found that 70 out of 100 laureates in the sample won their prize in a country different from their birthplace. We think this reinforces the "Intellectual Magnet" narrative. Whether the laureate was born in 1850 or 1950, we found a consistent pattern of talent migrating toward superior research environments.
 
-## Conclusion 
-Using the first 100 IDs numbers to analyze personal life factors about Nobel laureates, we found the era during which a prize was awarded had a large impact on who won it. In our sample, only 13% of the laureates were born after 1950 and 90 of them identified as male.This aligns with the known discrimination against women in scientific, technical, and political fields that was sustained through to contemporary periods. Women being denied access to these spaces explains why so few women would be laureates. Laureates were also commonly born in global meccas such as New York City or Paris where it is more than likely they were exposed to innovative thoughts & resources early enough in life to be placed on a Nobel Prize trajectory; though, 70% of them will win their Nobel in a city they were not born in. 
+## Conclusion
 
-Technically, we found that manually flattening the nested JSON was the only way to expose these disparities. Without a manual audit of the data structure, some of the outliers, such as birth year after 1950, would have been statistically invisible, buried beneath an expanse of historical data. 
+Using the first 100 IDs numbers to analyze personal life factors about Nobel laureates, we found the era during which a prize was awarded had a large impact on who won it. In our sample, only 13% of the laureates were born after 1950 and 90 of them identified as male.This aligns with the known discrimination against women in scientific, technical, and political fields that was sustained through to contemporary periods. Women being denied access to these spaces explains why so few women would be laureates. Laureates were also commonly born in global meccas such as New York City or Paris where it is more than likely they were exposed to innovative thoughts & resources early enough in life to be placed on a Nobel Prize trajectory; though, 70% of them will win their Nobel in a city they were not born in.
+
+Technically, we found that manually flattening the nested JSON was the only way to expose these disparities. Without a manual audit of the data structure, some of the outliers, such as birth year after 1950, would have been statistically invisible, buried beneath an expanse of historical data.
