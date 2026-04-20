@@ -11,12 +11,11 @@ editor: visual
 
 library(jsonlite)
 library(tidyverse)
+library(janitor)
 
-# Retrieve live JSON data
-raw_nobel <- fromJSON("https://api.nobelprize.org/2.1/laureates")
+#Our team retrieved live data for the first 100 IDs in the Nobel Prize database by appending ?limit=100 to the API call. Tough these IDs were largely assigned in the order the prizes were founded, some more recent laureates have been assigned lower IDs.
+raw_nobel <- fromJSON("https://api.nobelprize.org/2.1/laureates?limit=100")
 
-# Flatten the list into a tidy data frame
-laureates <- as_tibble(raw_nobel$laureates)
 ```
 
 Our team will complete Assignment 10B by using RStudio and the jsonlite package to pull live data from the Nobel Prize API. We plan to use tidyverse tools to turn the complex nested JSON files into clean, flattened data frames. Our analysis will include four data-driven questions (see below) focused on geographic and identity trends, including a specific look at international migration by comparing where winners were born versus where their affiliated organizations were located.
@@ -27,6 +26,143 @@ Our team will complete Assignment 10B by using RStudio and the jsonlite package 
 
 **Logical filtering:** *Question 3 (Filtering)*: How many Nobel laureates were born after the year 1950?
 
-**Complex: Question 4** *(Comparing Fields)*: How many Nobel laureates were born in a different country than where their winning organization was located?
+**Complex:** *Question 4 (Comparing Fields)*: How many Nobel laureates were born in a different country than where their winning organization was located?
 
 A data challenge we can anticipate is around any missing data and ensuring that we solve for that as we tackle answering the questions we identified.
+
+### Transform JSON into a Tidy Tibble
+
+```{r}
+
+# We manually extracted nested fields to ensure stability and avoid naming errors.By manually mapping these fields, we avoid the naming conflicts and data loss that occur during automatic flattening. This also allows us to safely handle the 'NA' values found in organizational records and missing historical entries.
+laureates <- tibble(
+  id = raw_nobel$laureates$id,
+  gender = raw_nobel$laureates$gender,
+  birth_date = raw_nobel$laureates$birth$date,
+  birth_city = raw_nobel$laureates$birth$place$city$en,
+  birth_country = raw_nobel$laureates$birth$place$locationString$en,
+  prizes = raw_nobel$laureates$nobelPrizes 
+)
+```
+
+### Question 1: What is the distribution of Nobel Prizes by gender?
+
+```{r}
+
+laureates %>%
+  count(gender)
+```
+
+### Gender Visualization
+
+```{r}
+# 2. Gender Plot (Q1)
+laureates %>%
+  count(gender) %>%
+  ggplot(aes(x = gender, y = n, fill = gender)) +
+  geom_col() +
+  geom_text(aes(label = n), vjust = -0.5, fontface = "bold", size = 3) +
+ scale_fill_manual(values = c("male" = "#4a148c", 
+                               "female" = "#7b1fa2", 
+                               "org" = "#ce93d8")) +
+  labs(
+    title = "Question 1: Distribution of Nobel Prizes by Gender",
+    x = "Gender",
+    y = "Number of Laureates"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  expand_limits(y = max(laureates$n) * 1.1)
+```
+
+We found that the dataset shows 90 of the 98 laureates with genders listed are male. We think this outcome is a direct reflection of the era from which this data is drawn. Since the API returns records starting from 1901, we are observing a time when institutional access for women in higher education and labs was severely restricted due to gender-based discrimination.
+
+### Question 2: Which 5 cities are the most common birthplaces for Nobel laureates?
+
+```{r}
+
+top_cities <- laureates %>%
+  filter(!is.na(birth_city)) %>%
+  count(birth_city, sort = TRUE) %>%
+  head(5)
+
+top_cities
+```
+
+We think birthplaces clustering around major global hubs like New York, Paris, and London could be an indication that these cities acted as centers of innovation in the early 1900s and continue to be in current times. This suggests being born near a concentrated source of resources, mentorship, and funding likely increased the probability of achieving Nobel-level success.
+
+### Question 3: How many Nobel laureates were born after the year 1950?
+
+```{r}
+
+laureates %>%
+  filter(birth_date >= "1950-01-01") %>%
+  nrow()
+```
+
+Only 13 individuals in this sample of 100 were born after 1950. We think this proves that the database's internal ID system is not a true timeline and some "modern" laureates are scattered within the sample of the first 100 IDs pulled. See visualization below for more distribution across birth periods.
+
+### Birth Period Visualization
+
+```{r}
+
+# Group data into 25-year quarter centuries
+quarter_century_data <- laureates %>%
+  mutate(
+    year = as.numeric(str_sub(birth_date, 1, 4)),
+    # Math to group: floor(year / 25) * 25
+    start_year = floor(year / 25) * 25,
+    end_year = start_year + 24,
+    period = paste0(start_year, " - ", end_year)
+  ) %>%
+  filter(!is.na(start_year)) %>%
+  count(period) %>%
+  arrange(period)
+
+# Generate plot
+ggplot(quarter_century_data, aes(x = period, y = n)) +
+  geom_col(fill = "#8e44ad", color = "white") +
+  # Adds the exact count on top of each bar
+  geom_text(aes(label = n), vjust = -0.5, size = 3, fontface = "bold") +
+  labs(
+    title = "Nobel Laureates Birth Periods",
+    subtitle = "Analysis of birth periods for the first 100 laureate IDs",
+    x = "25-Year Period",
+    y = "Number of Laureates"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+As seen in the visualization, the vast majority of our 100 ID sample was born between 1900 and 1950. We think the thirteen people we see in the 1950-1999 portion of the plot represents the most contemporary edge of this specific data slice.
+
+### Question 4: How many Nobel laureates were born in a different country than where their winning organization was located?
+
+```{r}
+
+#Extracting affiliation country from the list
+migration_analysis <- laureates %>%
+  mutate(
+    award_country = map_chr(prizes, function(x) {
+      # Pulling the first location string from the first affiliation
+      loc <- x$affiliations[[1]]$locationString$en
+      if (is.null(loc)) return(NA_character_) else return(loc[1])
+    })
+  ) %>%
+  filter(!is.na(birth_country), !is.na(award_country))
+
+# Count where birth country does not match award country
+migrated_count <- migration_analysis %>%
+  filter(birth_country != award_country) %>%
+  nrow()
+
+migrated_count
+```
+
+We found that 70 out of 100 laureates in the sample won their prize in a country different from their birthplace. We think this reinforces the "Intellectual Magnet" narrative. Whether the laureate was born in 1850 or 1950, we found a consistent pattern of talent migrating toward superior research environments.
+
+## Conclusion
+
+Using the first 100 IDs numbers to analyze personal life factors about Nobel laureates, we found the era during which a prize was awarded had a large impact on who won it. In our sample, only 13% of the laureates were born after 1950 and 90 of them identified as male.This aligns with the known discrimination against women in scientific, technical, and political fields that was sustained through to contemporary periods. Women being denied access to these spaces explains why so few women would be laureates. Laureates were also commonly born in global meccas such as New York City or Paris where it is more than likely they were exposed to innovative thoughts & resources early enough in life to be placed on a Nobel Prize trajectory; though, 70% of them will win their Nobel in a city they were not born in.
+
+Technically, we found that manually flattening the nested JSON was the only way to expose these disparities. Without a manual audit of the data structure, some of the outliers, such as birth year after 1950, would have been statistically invisible, buried beneath an expanse of historical data.
